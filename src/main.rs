@@ -55,14 +55,14 @@ fn send_amf(method: &str,body:Vec<Box<dyn Any>>)->Box<dyn Any>{
      //Ok(amfdeserializer::AMFDeserializer::deserialize(result.bytes().unwrap().split(|x| *x==u8::MAX).last().unwrap()));
 }
 
-fn change_profile_picture(ticket: String,bytearray: Vec<u8>){
+fn change_profile_picture(ticket: String,actor_id:i32,bytearray: Vec<u8>){
     let result = send_amf("MovieStarPlanet.WebService.Snapshots.AMFGenericSnapshotService.CreateSnapshot", vec![
         Box::new(TicketHeader{
             ticket: TicketGenerator::generate_header(ticket),
             any_attribute:Null
         }),
         
-        Box::new(88228438),
+        Box::new(actor_id ),
         Box::new("moviestar"),
         Box::new(bytearray),
         Box::new("jpg")]);
@@ -104,12 +104,13 @@ let result =send_amf("MovieStarPlanet.WebService.User.AMFUserServiceWeb.Login", 
 println!("Status: {}",status);
 if status == "Success"{
    let ticket=login_status.get("ticket").unwrap().downcast_ref::<String>().unwrap();
+   let actor_id=login_status.get("actor").unwrap().downcast_ref::<HashMap<String,Box<dyn Any>>>().unwrap().get("ActorId").unwrap().downcast_ref::<f64>().unwrap();
     println!("Your ticket {}",ticket);
 
     let mut image_buffer:Vec<u8> = Vec::new();
     
    std::fs::File::open("image.jpg").unwrap().read_to_end(&mut image_buffer).unwrap();
-    change_profile_picture(ticket.to_string(),image_buffer);
+    change_profile_picture(ticket.to_string(),*actor_id as i32,image_buffer);
     
 }
 sleep(Duration::new(6,0));

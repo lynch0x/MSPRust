@@ -66,7 +66,8 @@ impl AMFSerializer{
         else if value.is::<i32>(){
             stream.push(0);
             Self::write_double(stream, *value.downcast_ref::<i32>().unwrap() as f64);
-        }else if value.is::<TicketHeader>(){
+        }
+        else if value.is::<TicketHeader>(){
             stream.push(3);
             Self::write_utf8(stream, &String::from("Ticket"));
             stream.push(2);
