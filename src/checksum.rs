@@ -1,18 +1,15 @@
 
+use std::any::Any;
 use sha1::{Sha1, Digest};
-use std::{any::Any};
 use crate::ticket::TicketHeader;
-use crate::amfserializer::Null;
 pub struct ChecksumCalculator;
 
 impl ChecksumCalculator{
     pub fn create_checksum(data:&Vec<Box<dyn Any>>)->String{
         let checksumable = Self::from_array(data)+"2zKzokBI4^26#oiP"+&Self::get_ticket_value(data);
-        println!("Checksum string {}",checksumable);
         let mut hasher = Sha1::new();
         hasher.update(checksumable);
         let hash = hex::encode(hasher.finalize());
-        println!("Checksum hash {}",hash);
         hash
     }
     pub fn get_ticket_value(data:&Vec<Box<dyn Any>>)->String{
@@ -39,6 +36,9 @@ impl ChecksumCalculator{
             }
             if value.is::<String>(){
                 result += &value.downcast_ref::<String>().unwrap().to_string();
+            }
+            if value.is::<&str>(){
+                result += value.downcast_ref::<&str>().unwrap();
             }
             if value.is::<bool>(){
                 result += if *value.downcast_ref::<bool>().unwrap() {"True"} else {"False"}

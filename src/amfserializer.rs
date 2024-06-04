@@ -1,4 +1,4 @@
-use std::{any::Any, str::FromStr};
+use std::any::Any;
 
 use crate::ticket::TicketHeader;
 
@@ -54,6 +54,10 @@ impl AMFSerializer{
         else if value.is::<String>(){
             stream.push(2);
             Self::write_utf8(stream, value.downcast_ref::<String>().unwrap());
+        }
+        else if value.is::<&str>(){
+            stream.push(2);
+            Self::write_utf8_str(stream, *value.downcast_ref::<&str>().unwrap());
         }
         else if value.is::<bool>(){
             stream.push(1);
@@ -124,6 +128,12 @@ impl AMFSerializer{
     }
   pub fn write_utf8(stream: &mut Vec<u8>, value:&String){
     let bytes = value.as_bytes();
+    Self::write_uint16(stream, bytes.len() as u16);
+    Self::write_bytes(stream, bytes);
+  }
+  pub fn write_utf8_str(stream: &mut Vec<u8>, value:&str){
+    let bytes = value.as_bytes();
+ 
     Self::write_uint16(stream, bytes.len() as u16);
     Self::write_bytes(stream, bytes);
   }
