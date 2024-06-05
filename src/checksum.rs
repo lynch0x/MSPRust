@@ -1,6 +1,6 @@
 
 use std::any::Any;
-use sha1::{Sha1, Digest};
+use sha1::{ Digest, Sha1};
 use crate::ticket::TicketHeader;
 pub struct ChecksumCalculator;
 

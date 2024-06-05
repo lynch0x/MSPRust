@@ -1,10 +1,8 @@
 
 use rand::Rng;
-use crate::amfserializer::Null;
 use hex;
 pub struct TicketHeader{
-    pub ticket:String,
-    pub any_attribute:Null
+    pub ticket:String
 }
 pub struct TicketGenerator;
 
