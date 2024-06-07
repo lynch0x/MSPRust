@@ -146,7 +146,23 @@ pub struct AMFDeserializer;
 impl AMFDeserializer{
 
     pub fn deserialize(bytes: &[u8])->Box<dyn Any>{
-        let mut pos:usize = 0;
+        let mut pos:usize = 2;
+        let headers_length = Self::read_uint16(bytes, &mut pos);
+        let mut i:u16 = 0;
+        loop{
+            if i >= headers_length{
+                break;
+            }
+            Self::read_string(bytes, &mut pos);
+            Self::read_boolean(bytes, &mut pos);
+            Self::read_int32(bytes, &mut pos);
+            Self::read_data(bytes, &mut pos);
+            i+=1;
+        }
+        Self::read_uint16(bytes, &mut pos);
+        Self::read_string(bytes, &mut pos);
+        Self::read_string(bytes, &mut pos);
+        Self::read_int32(bytes, &mut pos);
         return Self::read_data(bytes, &mut pos);
     }
     pub fn read_data(bytes:&[u8],pos:&mut usize)-> Box<dyn Any>{
