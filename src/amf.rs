@@ -1,10 +1,11 @@
-use std::{any::Any, collections::HashMap, io::{Read, Write}, net::{SocketAddr, TcpStream, ToSocketAddrs}, time::Duration};
+use std::{any::Any, collections::HashMap, io::{Read, Write}, net::{SocketAddr, TcpStream, ToSocketAddrs}, sync::Arc, time::Duration, vec};
 
-use native_tls::TlsConnector;
 
+use webpki_roots::TLS_SERVER_ROOTS;
 use rand::Rng;
 use md5;
 use hex;
+use rustls::{ClientConfig, ClientConnection, ProtocolVersion, RootCertStore, ServerName};
 use sha1::{Sha1,Digest};
 pub fn send_amf(method: &str, body: Vec<Box<dyn Any>>) -> Box<dyn Any> {
     let message = AMFMessage {
@@ -29,24 +30,42 @@ pub fn send_amf(method: &str, body: Vec<Box<dyn Any>>) -> Box<dyn Any> {
     };
 
     let amfstream = AMFSerializer::serialize_message(&message);
+    let mut root_store = RootCertStore::empty();
 
-    let connector = TlsConnector::new().unwrap();
+
+    root_store.add_trust_anchors(TLS_SERVER_ROOTS.0.iter().map(|ta| {
+        rustls::OwnedTrustAnchor::from_subject_spki_name_constraints(
+            ta.subject,
+            ta.spki,
+            ta.name_constraints,
+        )
+    }));
+   
     let addr: SocketAddr = "ws-pl.mspapis.com:443"
         .to_socket_addrs()
         .unwrap()
         .next()
         .unwrap();
-
-    let stream = TcpStream::connect_timeout(&addr, Duration::from_secs(3))
+    // Configure the client with custom settings
+    let mut config = ClientConfig::builder()
+        .with_safe_defaults()
+        .with_root_certificates(root_store)
+        .with_no_client_auth();
+   
+    // Customize the cipher suites and ALPN protocols to affect the JA3 fingerprint
+    //config. = vec![&rustls::CipherSuite::TLS13_AES_128_GCM_SHA256,&rustls::CipherSuite::TLS13_AES_256_GCM_SHA384];
+    config.alpn_protocols.push(b"http/1.0".to_vec());
+    let server_name = ServerName::try_from("ws-pl.mspapis.com").unwrap();
+    let mut connector = ClientConnection::new(Arc::new(config),server_name).unwrap();
+    let mut stream = TcpStream::connect_timeout(&addr, Duration::from_secs(3))
         .expect("There was an error while connecting to host");
-
-    let mut stream = connector
-        .connect("ws-pl.mspapis.com", stream)
-        .unwrap();
+    stream.set_nonblocking(false).unwrap();
+    let mut tls_stream = rustls::Stream::new(&mut connector, &mut stream);
+  
 
     let mut final_vec = Vec::new();
     final_vec
-        .write(format!("POST /Gateway.aspx?method={} HTTP/1.1\r\n", method).as_bytes())
+        .write(format!("POST /Gateway.aspx?method={} HTTP/1.0\r\n", method).as_bytes())
         .unwrap();
     final_vec
         .write("content-type: application/x-amf\r\n".as_bytes())
@@ -71,13 +90,12 @@ pub fn send_amf(method: &str, body: Vec<Box<dyn Any>>) -> Box<dyn Any> {
         .unwrap();
     final_vec.write(&amfstream).unwrap();
 
-    stream.write_all(&final_vec).expect("Could not write body");
-
+    tls_stream.write_all(&final_vec).expect("Could not write body");
+        tls_stream.flush().unwrap();
     let mut response = Vec::new();
-    stream
-        .read_to_end(&mut response)
-        .expect("Could not read stream!");
-
+    connector
+        .reader().read(&mut response).unwrap();
+        println!("{}",String::from_utf8(response.clone()).unwrap());
     let http_headers_end = response
         .windows(4)
         .position(|window| window == b"\r\n\r\n")

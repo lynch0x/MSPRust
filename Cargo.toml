@@ -6,8 +6,15 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-sha1 = "0.10.6"
-md5 = "0.7.0"
-rand = "0.8.4"
-hex = "0.4.3"
-native-tls = "0.2"
+sha1 = "0.1.0"
+md5 = "0.1.0"
+rustls = { version = "0.20.0", default-features = false }
+webpki-roots = {version="0.19.0",default-features=false} 
+
+[profile.release]
+strip = "debuginfo"
+panic = "abort"
+lto = true
+codegen-units = 1
+opt-level = "z"
+
