@@ -1,9 +1,9 @@
-use std::{collections::HashMap,  io::{Cursor, Read, Seek, Write}};
+use std::{collections::BTreeMap,  io::{Cursor, Read, Write}};
 
 #[derive(Debug)] 
 pub struct ASObject{
     pub name:Option<String>,
-    pub items:HashMap<String,AMFValue>
+    pub items:BTreeMap<String,AMFValue>
 }
 #[derive(Debug)] 
 pub enum AMFValue{
@@ -89,7 +89,7 @@ impl AMFDeserializer{
         Self::read_aso(cursor)
     }
     fn read_aso(cursor:&mut Cursor<Vec<u8>>)->ASObject{
-        let mut map:HashMap<String,AMFValue> = HashMap::new();
+        let mut map:BTreeMap<String,AMFValue> = BTreeMap::new();
         loop{
             let name = Self::read_string(cursor);
             let marker = Self::read_byte(cursor);
@@ -120,6 +120,9 @@ impl AMFDeserializer{
     }
     fn read_string(cursor:&mut Cursor<Vec<u8>>)->String{
         let len = Self::read_u16(cursor);
+        if len == 0{
+            return String::new();
+        }
         let mut str_bytes = vec![0;len as usize];
         let _ = cursor.read_exact(&mut str_bytes);
         String::from_utf8(str_bytes).unwrap()

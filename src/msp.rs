@@ -1,5 +1,5 @@
 use core::hash;
-use std::{collections::HashMap, io::{Read, Write}, net::{SocketAddr, TcpStream, ToSocketAddrs}, sync::Arc, time::{Duration, SystemTime}};
+use std::{collections::{BTreeMap, HashMap}, io::{Read, Write}, net::{SocketAddr, TcpStream, ToSocketAddrs}, sync::Arc, time::{Duration, SystemTime}};
 
 
 use rustls::{ClientConfig, ClientConnection};
@@ -137,8 +137,8 @@ impl TicketGenerator {
         let md5_hash = hex_encode(&md5::compute(random_number_bytes).to_vec());
         
 
-        let result = format!("{}{}{:?}", ticket, md5_hash, hex_encode(&random_number_bytes.to_vec()));
-        let mut map:HashMap<String,AMFValue> = HashMap::new();
+        let result = format!("{}{}{}", ticket, md5_hash, hex_encode(&random_number_bytes.to_vec()));
+        let mut map:BTreeMap<String,AMFValue> = BTreeMap::new();
         map.insert("Ticket".into(),AMFValue::STRING(result));
         map.insert("anyAttribute".into(),  AMFValue::NULL);
         AMFValue::ASObject(ASObject{
@@ -172,26 +172,33 @@ impl ChecksumCalculator {
         }
         "XSV7%!5!AX2L8@vn".to_string()
     }
-
+fn from_object_inner(data:&AMFValue)->String{
+    match data{
+        AMFValue::BOOL(value)=>{
+            if *value{"True".into()}else{"False".into()}
+        },
+        AMFValue::BYTEARRAY(value)=>Self::from_byte_array(&value),
+        AMFValue::ASObject(value)=>Self::from_aso(&value),
+        AMFValue::INT(value)=>value.to_string(),
+        AMFValue::STRING(value)=>value.clone(),
+        AMFValue::NULL=>String::new(),
+        AMFValue::ARRAY(value)=>Self::from_array(&value)
+    }
+}
+fn from_aso(data:&ASObject)->String{
+    if data.items.contains_key("Ticket"){
+        return String::new();
+    }
+let mut str = String::new();
+for item in &data.items{
+    str += &Self::from_object_inner(item.1);
+}
+str
+}
     pub fn from_array(data: &Vec<AMFValue>) -> String {
         data.iter()
             .filter_map(|value| {
-                if let AMFValue::ASObject(val) = value {
-                    if let AMFValue::STRING(ticket) = val.items.get_key_value("Ticket").unwrap().1{
-                        return None
-                    }
-                    None
-                } else if let AMFValue::INT(num) = value {
-                    Some(num.to_string())
-                } else if let AMFValue::STRING(s) = value {
-                    Some(s.clone())
-                } else if let AMFValue::BOOL(b) = value {
-                    Some(if *b { "True".to_string() } else { "False".to_string() })
-                } else if let AMFValue::BYTEARRAY(array) = value {
-                    Some(Self::from_byte_array(array))
-                } else {
-                    None
-                }
+                Some(Self::from_object_inner(value))
             })
             .collect()
     }
