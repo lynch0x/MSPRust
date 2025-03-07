@@ -1,11 +1,11 @@
 use std::{collections::BTreeMap,  io::{Cursor, Read, Write}};
 
-#[derive(Debug)] 
+
 pub struct ASObject{
     pub name:Option<String>,
     pub items:BTreeMap<String,AMFValue>
 }
-#[derive(Debug)] 
+
 pub enum AMFValue{
     INT(f64),
     BOOL(bool),
@@ -37,7 +37,7 @@ impl AMFDeserializer{
         let mut cursor = Cursor::new(input);
         let _ = Self::read_u16(&mut cursor);
         let headers_count = Self::read_u16(&mut cursor);
-        for n in 0..headers_count{
+        for _ in 0..headers_count{
             let _ = Self::read_string(&mut cursor);
             let _ = Self::read_byte(&mut cursor);
             let _  = Self::read_i32(&mut cursor);
@@ -192,10 +192,35 @@ impl AMFSerializer{
                     Self::write_data(cursor,item.1);
                }
                Self::write_end_markup(cursor);
+            },
+            AMFValue::BYTEARRAY(value)=>{
+                let _ = cursor.write_all(&[17,12]);
+                let len = (value.len() as u32) << 1 | 1;
+                Self::write_amf3_uint32_data(cursor,len);
+                let _ = cursor.write_all(&value);
             }
             _=>todo!()
         }
     }
+
+fn write_amf3_uint32_data(cursor: &mut Cursor<Vec<u8>>, value: u32) {
+    let  value = value & 536870911; // Mask to 29 bits (0x1FFFFFFF)
+
+    if value < 128 {
+        cursor.write_all(&[value as u8]).unwrap();
+    } else if value < 16384 {
+        cursor.write_all(&[(value >> 7 | 128) as u8, (value & 127) as u8]).unwrap();
+    } else if value < 2097152 {
+        cursor.write_all(&[
+            (value >> 14 | 128) as u8,
+            (value >> 7 & 127 | 128) as u8,
+            (value & 127) as u8,
+        ]).unwrap();
+    } else {
+        // TODO: Handle larger values if necessary
+    }
+}
+
     fn write_end_markup(cursor:&mut Cursor<Vec<u8>>){
         let _= cursor.write_all(&[0,0,9]);
     }
