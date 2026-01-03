@@ -2,27 +2,30 @@ use sha1::Sha1;
 
 use crate::amfnew::{AMFValue, ASObject};
 
-pub fn create_checksum(data: &Vec<AMFValue>) -> String {
-    let checksumable: String = from_array(data) + "2zKzokBI4^26#oiP" + &get_ticket_value(data);
+pub fn create_checksum(data: &AMFValue) -> String {
+    let checksumable: String = from_object_inner(data) + "2zKzokBI4^26#oiP" + &get_ticket_value(data);
     let mut hasher = Sha1::new();
     hasher.update(checksumable.as_bytes());
     return hasher.hexdigest();
 }
 
-pub fn get_ticket_value(data: &Vec<AMFValue>) -> String {
-    for item in data {
-        match item{
-            AMFValue::ASObject(value)=>{
-                if let AMFValue::STRING(ticket) = value.items.get_key_value("Ticket").unwrap().1{
-            let podzial: Vec<&str> = ticket.split(',').collect();
-            if let Some(koncowka) = podzial.last() {
-                return format!("{}{}", podzial[0], &koncowka[koncowka.len() - 5..]);
-            }}
+pub fn get_ticket_value(data: &AMFValue) -> String {
+    if let AMFValue::ARRAY(ar) = data {
+        for item in ar {
+            if let AMFValue::ASObject(value) = item {
+                if let Some(value) = value.items.get("Ticket") {
+                    if let AMFValue::STRING(ticket) = value {
+                        let podzial: Vec<&str> = ticket.split(',').collect();
+                        if let Some(koncowka) = podzial.last() {
+                            return format!("{}{}", podzial[0], &koncowka[koncowka.len() - 5..]);
+                        }
+                    }
+                }
+            }
         }
-            _=>continue
-        }
+       return "XSV7%!5!AX2L8@vn".to_string();
     }
-    "XSV7%!5!AX2L8@vn".to_string()
+  String::new()
 }
 fn from_object_inner(data:&AMFValue)->String{
 match data{

@@ -6,16 +6,17 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-sha1 = "0.1.0"
-md5 = "0.1.0"
-hex = "0.4"
-[build-dependencies]
-cc = "1.0.46"
-
+sha1 = "0.1.1"
+md5 = "0.8.0"
+hex = "0.4.3"
+byteorder = "1.5"
+windows = { version = "0.62.2", features = [
+    "Win32_Foundation",
+    "Win32_Networking_WinInet",
+] }
 [profile.release]
-strip = "debuginfo"
-panic = "abort"
 lto = true
+opt-level = 3
+panic = "abort"
 codegen-units = 1
-opt-level = "z"
-
+strip = true
