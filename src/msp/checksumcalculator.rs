@@ -16,8 +16,15 @@ pub fn get_ticket_value(data: &AMFValue) -> String {
                 if let Some(value) = value.items.get("Ticket") {
                     if let AMFValue::STRING(ticket) = value {
                         let podzial: Vec<&str> = ticket.split(',').collect();
-                        if let Some(koncowka) = podzial.last() {
-                            return format!("{}{}", podzial[0], &koncowka[koncowka.len() - 5..]);
+                        let loc5 = podzial[0];
+
+                        // _loc6_ = _loc4_.pop()
+                        if let Some(loc6) = podzial.last() {
+                            // Bezpieczne pobranie ostatnich 5 znaków (z zabezpieczeniem przed krótkim stringiem)
+                            let start_idx = loc6.len().saturating_sub(5);
+                            let loc7 = &loc6[start_idx..];
+
+                            return format!("{}{}", loc5, loc7);
                         }
                     }
                 }

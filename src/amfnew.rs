@@ -1,13 +1,14 @@
 use std::{collections::BTreeMap, io::{Cursor, Read, Write}};
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 
-
+#[derive(Debug)]
 pub struct ASObject {
     pub name: Option<String>,
     pub items: BTreeMap<String, AMFValue>
 }
 
 
+#[derive(Debug)]
 pub enum AMFValue {
     INT(f64),
     BOOL(bool),
@@ -91,6 +92,7 @@ pub struct AMFMessage {
 }
 
 
+#[derive(Debug)]
 pub enum AMFError {
     IoError,
     ValueNotFound,

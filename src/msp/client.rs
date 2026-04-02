@@ -1,118 +1,41 @@
+use std::fs;
 use crate::amfnew::*;
+use crate::httpwindows::net_connection;
 use super::checksumcalculator;
-use windows::core::PCSTR;
-use windows::Win32::{Foundation::*, Networking::WinInet::*};
-use std::ffi::CString;
+use base64::{engine::general_purpose, Engine as _};
+use rand::Rng;
+fn generate_id() -> String {
+    let mut rng = rand::rng();
+    let mut s = String::new();
 
-static mut H_INTERNET: *mut ::core::ffi::c_void = std::ptr::null_mut();
-static mut H_CONNECT: *mut ::core::ffi::c_void = std::ptr::null_mut();
-
-pub unsafe fn net_connection(
-    host: &str,
-    path: &str,
-    data: &[u8],
-) -> Result<Vec<u8>, ()> {
-
-    if H_INTERNET.is_null() {
-        let agent = CString::new(
-            "Mozilla/5.0 (Windows; U; pl-PL) AppleWebKit/533.19.4 \
-             (KHTML, like Gecko) AdobeAIR/32.0"
-        ).unwrap();
-
-        H_INTERNET = InternetOpenA(
-            PCSTR(agent.as_ptr() as _),
-            0u32,
-            PCSTR::null(),
-            PCSTR::null(),
-            0,
-        );
-
-        if H_INTERNET.is_null() {
-            return Err(());
-        }
+    while s.len() < 48 {
+        let num: u32 = rng.random(); // odpowiednik Math.random() * int.MAX_VALUE
+        s.push_str(&format!("{:x}", num));
     }
 
-    if H_CONNECT.is_null() {
-        let host_c = CString::new(host).unwrap();
-
-        H_CONNECT = InternetConnectA(
-            H_INTERNET,
-            PCSTR(host_c.as_ptr() as _),
-            443,
-            PCSTR::null(),
-            PCSTR::null(),
-            INTERNET_SERVICE_HTTP,
-            0,
-            None,
-        );
-
-        if H_CONNECT.is_null() {
-            return Err(());
-        }
-    }
-
-    let path_c = CString::new(path).unwrap();
-    let method = CString::new("POST").unwrap();
-    let referer=CString::new("app:/cache/t1.bin/[[DYNAMIC]]/2").unwrap();
-    let version=CString::new("HTTP/1.1").unwrap();
-    let h_request = HttpOpenRequestA(
-        H_CONNECT,
-        PCSTR(method.as_ptr() as _),
-        PCSTR(path_c.as_ptr() as _),
-        PCSTR(version.as_ptr() as _),
-        PCSTR(referer.as_ptr() as _),
-        None,
-        INTERNET_FLAG_SECURE | INTERNET_FLAG_KEEP_CONNECTION | INTERNET_FLAG_NO_CACHE_WRITE,
-        None,
-    );
-
-    if h_request.is_null() {
-        return Err(());
-    }
-
-    let headers = CString::new("Content-Type: application/x-amf\r\n").unwrap();
-
-    let _ = HttpSendRequestA(
-        h_request,
-        Some(headers.as_bytes()),
-        Some(data.as_ptr() as _),
-        data.len() as _,
-    );
-
-    let mut buffer = Vec::new();
-    let mut temp = [0u8; 1024];
-    let mut read = 0;
-
-    loop {
-        if !InternetReadFile(
-            h_request,
-            temp.as_mut_ptr() as _,
-            temp.len() as u32,
-            &mut read,
-        ).is_ok() || read == 0 {
-            break;
-        }
-        buffer.extend_from_slice(&temp[..read as usize]);
-    }
-
-    let _ = InternetCloseHandle(h_request);
-
-    Ok(buffer)
+    let trimmed = &s[..46];
+    general_purpose::STANDARD.encode(trimmed)
 }
-
-pub fn send_amf(method: &str, body: AMFValue) -> Result<AMFValue, AMFError> {
+pub fn send_amf(method: &str, body: AMFValue,proxy:Option<&str>) -> Result<AMFValue, AMFError> {
     let message = AMFMessage {
         headers: vec![
-            AMFHeader {
-                name: String::from("needClassName"),
-                must_understand: false,
-                body: AMFValue::BOOL(false),
+            AMFHeader{
+                name:String::from("sessionID"),
+                must_understand:false,
+                body:AMFValue::STRING(String::from(generate_id()))
             },
             AMFHeader {
                 name: String::from("id"),
                 must_understand: false,
                 body: AMFValue::STRING(checksumcalculator::create_checksum(&body))
             }
+            ,
+            AMFHeader {
+                name: String::from("needClassName"),
+                must_understand: false,
+                body: AMFValue::BOOL(true),
+            }
+
         ],
         version: 0,
         body: AMFBody {
@@ -126,10 +49,13 @@ pub fn send_amf(method: &str, body: AMFValue) -> Result<AMFValue, AMFError> {
     let mut path = String::new();
     path += "/Gateway.aspx?method=";
     path += method;
-
+    // Używamy sufiksu 'b' dla tablicy bajtów (u8), co jest bezpieczniejsze dla protokołów binarnych
+    const HEADERS: &[u8] = b"x-flash-version: 32,0,0,100\r\n\
+                         Content-Type: application/x-amf\r\n\
+                         Accept-Encoding: gzip, deflate\r\n";
     let resp = unsafe {
-        net_connection("ws-pl.mspapis.com", &path, amf_stream.as_slice())
+        net_connection("ws-pl.moviestarplanet.app", &path,"POST",Some(HEADERS), Some(amf_stream.as_slice()),proxy)
     }.map_err(|_| AMFError::RequestFailed)?;
-
+    fs::write("response.bin", &resp).expect("Nie udało się zapisać pliku");
     AMFDeserializer::deserialize_amf_message(resp)
 }
